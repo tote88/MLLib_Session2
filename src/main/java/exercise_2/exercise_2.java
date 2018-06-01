@@ -2,7 +2,13 @@ package exercise_2;
 
 
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.ml.Pipeline;
+import org.apache.spark.ml.PipelineModel;
+import org.apache.spark.ml.PipelineStage;
 import org.apache.spark.ml.feature.Bucketizer;
+import org.apache.spark.ml.feature.OneHotEncoderEstimator;
+import org.apache.spark.ml.feature.OneHotEncoderModel;
+import org.apache.spark.ml.feature.VectorAssembler;
 import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -36,7 +42,14 @@ public class exercise_2 {
 
 		Dataset<Row> DifPfeiffer = categoriseDifPfeiffer(DifBarthel);
 
-		DifPfeiffer.show();
+		OneHotEncoderEstimator oneHotEncoderEstimator = new OneHotEncoderEstimator()
+				.setInputCols(new String[]{"BarthelD", "PfeifferD", "DifBarthelD", "DifPfeifferD", "HemoglobinaD", "AlbuminaD", "CreatininaD",})
+				.setOutputCols(new String[]{"BarthelDummy", "PfeifferDummy", "DifBarthelDummy", "DifPfeifferDummy", "HemoglobinaDummy", "AlbuminaDummy", "CreatininaDummy"});
+
+
+		Dataset<Row> transform = oneHotEncoderEstimator.fit(DifPfeiffer).transform(DifPfeiffer);
+
+		transform.show();
 
 	    ss.stop(); 
 	}

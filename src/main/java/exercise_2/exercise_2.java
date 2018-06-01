@@ -8,6 +8,7 @@ import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.ml.classification.LinearSVC;
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator;
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator;
+import org.apache.spark.ml.feature.Bucketizer;
 import org.apache.spark.ml.feature.HashingTF;
 import org.apache.spark.ml.feature.Tokenizer;
 import org.apache.spark.ml.param.ParamMap;
@@ -41,7 +42,16 @@ public class exercise_2 {
 
 		Dataset<Row> pacientes = getRowDataset(ss);
 
-		pacientes.show();
+		double[] splits =
+				{Double.NEGATIVE_INFINITY, 12, 18, 41, 69, Double.POSITIVE_INFINITY};
+		Bucketizer bucketizer = new Bucketizer()
+				.setInputCol("DiasEstancia") //To be removed
+				.setOutputCol("DiasEstanciaDiscretized")
+				.setSplits(splits);
+
+		Dataset<Row> output = bucketizer.transform(pacientes);
+
+		output.show();
 
 	    ss.stop(); 
 	}

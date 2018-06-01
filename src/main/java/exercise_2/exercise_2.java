@@ -1,34 +1,14 @@
 package exercise_2;
 
 
-import org.apache.commons.io.FileUtils;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.ml.classification.LinearSVC;
-import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator;
-import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator;
 import org.apache.spark.ml.feature.Bucketizer;
-import org.apache.spark.ml.feature.HashingTF;
-import org.apache.spark.ml.feature.Tokenizer;
-import org.apache.spark.ml.param.ParamMap;
-import org.apache.spark.ml.tuning.CrossValidator;
-import org.apache.spark.ml.tuning.CrossValidatorModel;
-import org.apache.spark.ml.tuning.ParamGridBuilder;
+import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.apache.spark.sql.functions.callUDF;
 import static org.apache.spark.sql.types.DataTypes.*;
@@ -42,27 +22,95 @@ public class exercise_2 {
 
 		Dataset<Row> pacientes = getRowDataset(ss);
 
-		double[] splits =
-				{Double.NEGATIVE_INFINITY, 12, 18, 41, 69, Double.POSITIVE_INFINITY};
-		Bucketizer bucketizer = new Bucketizer()
-				.setInputCol("DiasEstancia") //To be removed
-				.setOutputCol("DiasEstanciaDiscretized")
-				.setSplits(splits);
+		Dataset<Row> splitted = splitDiasEstancia(pacientes);
 
-		Dataset<Row> output = bucketizer.transform(pacientes);
+		Dataset<Row> withoutNA = imputeValueToNA(splitted);
 
-		output.show();
+		Dataset<Row> categorised = categorise(withoutNA);
+
+		categorised.show();
 
 	    ss.stop(); 
 	}
 
+	private static Dataset<Row> categorise(Dataset<Row> withoutNA) {
+		// Hemoglobina
+		double[] splits =
+				{Double.NEGATIVE_INFINITY, -1000, 12.0, Double.POSITIVE_INFINITY};
+		Bucketizer bucketizer = new Bucketizer()
+				.setInputCol("Hemoglobina") //To be removed (?)
+				.setOutputCol("HemoglobinaD")
+				.setSplits(splits);
+
+		Dataset<Row> step1 = bucketizer.transform(withoutNA);
+
+		double[] splits2 =
+				{Double.NEGATIVE_INFINITY, -1000, 1.11, Double.POSITIVE_INFINITY};
+		Bucketizer bucketizer2 = new Bucketizer()
+				.setInputCol("Creatinina") //To be removed (?)
+				.setOutputCol("CreatininaD")
+				.setSplits(splits2);
+
+		Dataset<Row> step2 = bucketizer2.transform(step1);
+
+		double[] splits3 =
+				{Double.NEGATIVE_INFINITY, -1000, 3.5, 5.0, Double.POSITIVE_INFINITY};
+		Bucketizer bucketizer3 = new Bucketizer()
+				.setInputCol("Albumina") //To be removed (?)
+				.setOutputCol("AlbuminaD")
+				.setSplits(splits3);
+
+		Dataset<Row> step3 = bucketizer3.transform(step2);
+
+		return step3;
+	}
+
+	private static Dataset<Row> imputeValueToNA(Dataset<Row> splitted) {
+//		String[] colImputar = {"Hemoglobina", "Creatinina", "Albumina", "Barthel", "Pfeiffer", "DifBarthel", "DifPfeiffer"};
+		String[] colImputar = {"Hemoglobina", "Creatinina", "Albumina", "Barthel", "Pfeiffer", "DifBarthel", "DifPfeiffer", "IndicadorDemencia", "IndicadorConstipacion", "IndicadorSordera", "IndicadorAltVisual", "DiferenciaBarthel", "DiferenciaPfeiffer"};
+		return splitted.na().fill(-1000, colImputar);
+	}
+
+	private static Dataset<Row> splitDiasEstancia(Dataset<Row> pacientes) {
+		double[] splits =
+				{Double.NEGATIVE_INFINITY, 12, 42, 70, Double.POSITIVE_INFINITY};
+		Bucketizer bucketizer = new Bucketizer()
+				.setInputCol("DiasEstancia") //To be removed (?)
+				.setOutputCol("DiasEstanciaD")
+				.setSplits(splits);
+
+		return bucketizer.transform(pacientes);
+	}
+
 	private static Dataset<Row> getRowDataset(SparkSession ss) {
+		StructType schema = new StructType()
+				.add("Id", "integer")
+				.add("IndicadorDemencia", "integer")
+				.add("IndicadorConstipacion", "integer")
+				.add("IndicadorSordera", "integer")
+				.add("IndicadorAltVisual", "integer")
+				.add("Barthel", "integer")
+				.add("Pfeiffer", "integer")
+				.add("DiferenciaBarthel", "integer")
+				.add("DiferenciaPfeiffer", "integer")
+				.add("Hemoglobina", "float")
+				.add("Creatinina", "float")
+				.add("Albumina", "float")
+				.add("ListaDiagnosticosPri", "string")
+				.add("ListaDiagnosticosSec", "string")
+				.add("ListaProcedimientosPri", "string")
+				.add("ListaProcedimientosSec", "string")
+				.add("ListaCausasExternas", "string")
+				.add("Reingreso", "integer")
+				.add("DiasEstancia", "integer");
+
 		return ss.read()
-					.format("com.databricks.spark.csv")
+					.format("csv")
 					.option("header", "true")
-					.option("inferSchema", "true")
+					//.option("inferSchema", "true")
 					.option("sep", ";")
-					//.schema(schema)
+					.option("nullValue", "NA")
+					.schema(schema)
 					.csv("C:\\Users\\tote8\\Documents\\MBDMA\\HandsOn\\MLLib\\mllib2\\src\\main\\resources\\PacientesSim.csv");
 	}
 }

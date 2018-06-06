@@ -3,6 +3,7 @@
 import exercise_2.exercise_2;
 import org.apache.spark.sql.SparkSession;
 import exercise_1.exercise_1;
+import exercise_2_victor.exercise_2_victor;
 
  
 
@@ -16,8 +17,9 @@ public class UPCSchool_MLlib {
 		SparkSession spark = SparkSession.builder().master("local[*]")
 				.appName("spamDetection")
 				.getOrCreate();
-		exercise_2.pacientesModel(spark);
-		spark.close(); 
+		//exercise_2.pacientesModel(spark);
+		exercise_2_victor.main(spark);
+		spark.close();
 	}
 
 }

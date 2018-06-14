@@ -1,9 +1,5 @@
 package exercise_2_victor;
 
-import static org.apache.spark.sql.types.DataTypes.StringType;
-import static org.apache.spark.sql.types.DataTypes.FloatType;
-import static org.apache.spark.sql.types.DataTypes.createStructField;
-
 import java.io.BufferedReader;
 import java.io.FileReader;
 
@@ -32,6 +28,8 @@ import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.api.java.UDF1;
 import static org.apache.spark.sql.functions.callUDF;
+import static org.apache.spark.sql.types.DataTypes.*;
+
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
@@ -48,7 +46,13 @@ public class exercise_2_victor {
 					//.schema(schema)
 					.csv("C:\\Users\\tote8\\Documents\\MBDMA\\HandsOn\\MLLib\\mllib2\\src\\main\\resources\\PacientesSim.csv");
 	}
-	
+
+	protected static Dataset<Row> setNA (Dataset<Row> data) {
+		String[] cols = {"Hemoglobina", "Creatinina", "Albumina", "Barthel", "Pfeiffer", "DiferenciaBarthel", "DiferenciaPfeiffer"};
+		data = data.na().fill(-1000, cols);
+		return data;
+	}
+
 	protected static Dataset<Row> discretization (Dataset<Row> data) {
 		double[] splits = {Double.NEGATIVE_INFINITY, 12,42,70, Double.POSITIVE_INFINITY};
 		Bucketizer bucketizer = new Bucketizer()
@@ -56,11 +60,7 @@ public class exercise_2_victor {
 				.setOutputCol("DiasEstancia2")
 				.setSplits(splits); 
 		data = bucketizer.transform(data);
-		
-		//NAs
-		String[] cols = {"Hemoglobina", "Creatinina", "Albumina", "Barthel", "Pfeiffer", "DiferenciaBarthel", "DiferenciaPfeiffer"};
-		data = data.na().fill(-1000,cols);
-		
+
 		double[] splitsHemoglobina = {Double.NEGATIVE_INFINITY, -999,12,Double.POSITIVE_INFINITY};
 		bucketizer = new Bucketizer()
 				.setInputCol("Hemoglobina")
@@ -77,7 +77,7 @@ public class exercise_2_victor {
 		
 		double[] splitsAlbumina = {Double.NEGATIVE_INFINITY, -999,3.5, 5.0,Double.POSITIVE_INFINITY};
 		bucketizer = new Bucketizer()
-				.setInputCol("Albumina")
+				.setInputCol("newAlbumina")
 				.setOutputCol("Albumina2")
 				.setSplits(splitsAlbumina); 
 		data = bucketizer.transform(data);
@@ -212,49 +212,23 @@ public class exercise_2_victor {
 		return featurizedDF;
 	}
 
-	/**
-	 * Cal revisar aquesta funció
-	 * @param train
-	 * @return
-	 */
-	public static CrossValidatorModel fitModel(Dataset<Row> train)
-	{
-
-		/*LinearSVC lsvc = new LinearSVC()
-				.setMaxIter(5)
-				.setLabelCol("DiasEstancia2")
-				.setFeaturesCol("features");
-
-		OneVsRest ovr = new OneVsRest()
-				.setClassifier(lsvc)
-				.setLabelCol("DiasEstancia2")
-				.setFeaturesCol("features");
-
-		OneVsRestModel ovrModel = ovr.fit(featurizedDF);
-
-		Dataset<Row> predictions = ovrModel.transform();
-
-		ParamMap[] paramGrid = new ParamGridBuilder()
-		  .addGrid(lsvc.regParam(), new double[] {10.0,1.0,0.1})
-		  .build();
-
-		CrossValidator cv = new CrossValidator()
-		  .setEstimator(lsvc)
-		  .setEvaluator(new MulticlassClassificationEvaluator()
-					.setMetricName("accuracy")
-					.setLabelCol("DiasEstancia2")
-					.setPredictionCol("prediction"))
-		  .setEstimatorParamMaps(paramGrid).setNumFolds(5);
-		CrossValidatorModel cvModel = cv.fit(train);
-		return(cvModel);*/
-		return null;
-	}
 	
 	public static void main(SparkSession ss) {
 
 		JavaSparkContext jsc = new JavaSparkContext(ss.sparkContext());
 		Dataset<Row> data = getRowDataset(ss);
-		
+		data = setNA(data);
+
+		ss.udf().register("modAlbuminaLevels", new UDF1<Double, Double>() {
+			@Override
+			public Double call(final Double actLevel) {
+				Double newLevel;
+				if (actLevel > 3.5) newLevel = 1.0;
+				else newLevel = actLevel;
+				return (newLevel);
+			}
+		}, DoubleType);
+		data = data.withColumn("newAlbumina", callUDF("modAlbuminaLevels", data.col("Albumina")));
 		data = discretization(data);
 		data = dummyzation(data);
 		data = preprocessListColumns(data);
@@ -285,10 +259,9 @@ public class exercise_2_victor {
 		OneVsRestModel ovrModel = ovr.fit(train);
 
 		ParamMap[] paramGrid = new ParamGridBuilder()
-				.addGrid(lsvc.regParam(), new double[] {10.0,1.0,0.1})
+				.addGrid(lsvc.regParam(), new double[] {1.0, 0.1, 0.01})
 				.build();
 
-		//Dataset<Row> predictions = ovrModel.transform(test).select("prediction","DiasEstancia2");
 		CrossValidator cv = new CrossValidator()
 				.setEstimator(ovr)
 				.setEvaluator(new MulticlassClassificationEvaluator()
@@ -302,11 +275,6 @@ public class exercise_2_victor {
 	    // Predicciones sobre test set
 	    Dataset<Row> predictions = cvModel.transform(test).select("prediction","DiasEstancia2");
 
-	    // Definimos un evaluador 
-//	    MulticlassClassificationEvaluator evaluator = new MulticlassClassificationEvaluator()
-//			        .setMetricName("accuracy")
-//			        .setLabelCol("DiasEstancia2")
-//			        .setPredictionCol("prediction");
 	    MulticlassMetrics evaluator = new MulticlassMetrics(predictions);
 
 	    double accuracy = evaluator.accuracy();

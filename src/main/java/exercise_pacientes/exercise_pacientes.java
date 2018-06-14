@@ -1,17 +1,6 @@
-package exercise_2_victor;
+package exercise_pacientes;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-
-import java.util.HashMap;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.ml.classification.LinearSVC;
 import org.apache.spark.ml.classification.OneVsRest;
 import org.apache.spark.ml.classification.OneVsRestModel;
@@ -24,17 +13,13 @@ import org.apache.spark.ml.tuning.ParamGridBuilder;
 import org.apache.spark.mllib.evaluation.MulticlassMetrics;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.api.java.UDF1;
 import static org.apache.spark.sql.functions.callUDF;
 import static org.apache.spark.sql.types.DataTypes.*;
 
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 
-
-public class exercise_2_victor {
+public class exercise_pacientes {
 	
 	protected static Dataset<Row> getRowDataset(SparkSession ss) {
 		return ss.read()
@@ -238,11 +223,7 @@ public class exercise_2_victor {
 		Dataset<Row>[] splits= data.randomSplit(new double[] {0.3,0.7});
 	    Dataset<Row> train = splits[1];
 	    Dataset<Row> test = splits[0];	    
-		
-//	    A revisar
-	 // Aseguramos permanencia del train en la memoria de los workers si es posible
-//	    és necessari en aquest cas?
-	    train.persist();
+
 	    
 	    // Ajustamos el modelo (SVM con CV)
 
